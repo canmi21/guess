@@ -1,17 +1,12 @@
 /* src/lib.rs */
 
 #![deny(missing_docs)]
-/* src/lib.rs */
 #![deny(unsafe_code)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
 //! # Guess
 //!
-//! High-performance zero-copy network protocol detection from first bytes.
-//!
-//! `guess` is designed for scenarios where you need to identify the application-layer
-//! protocol of a new connection as quickly as possible, typically by inspecting only
-//! the first 64 bytes of data.
+//! High-performance zero-copy network protocol detection with version awareness.
 
 mod builder;
 #[cfg(feature = "std")]
@@ -28,18 +23,49 @@ use thiserror::Error;
 /// Maximum bytes to inspect for protocol detection by default.
 pub const MAX_INSPECT_BYTES: usize = 64;
 
+/// Detection status for a single protocol.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DetectionStatus {
+	/// Confirmed match.
+	Match,
+	/// Confirmed no match.
+	NoMatch,
+	/// Prefix matches, but more data is needed for confirmation.
+	Incomplete,
+}
+
+/// Protocol version information (Zero-copy).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum ProtocolVersion<'a> {
+	/// HTTP version (e.g., "1.1", "2.0")
+	Http(&'a str),
+	/// TLS version (e.g., "1.2", "1.3")
+	Tls(&'a str),
+	/// SSH version (e.g., "2.0")
+	Ssh(&'a str),
+	/// Redis RESP version (2 or 3)
+	Redis(u8),
+	/// Version unknown or not applicable
+	Unknown,
+}
+
+/// Detailed protocol information including version.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ProtocolInfo<'a> {
+	/// The detected protocol.
+	pub protocol: Protocol,
+	/// The detected version.
+	pub version: ProtocolVersion<'a>,
+}
+
 /// Errors that can occur during protocol detection.
 #[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
 pub enum DetectionError {
 	/// Data is insufficient to perform the detection.
-	#[error("insufficient data: need at least {required} bytes, but got {got}")]
-	InsufficientData {
-		/// The minimum number of bytes required for detection.
-		required: usize,
-		/// The number of bytes actually provided.
-		got: usize,
-	},
-	/// The requested protocol is not enabled in the current detector or build.
+	#[error("insufficient data: need more bytes to confirm protocol")]
+	InsufficientData,
+	/// The requested protocol is not enabled.
 	#[error("protocol {0:?} is not enabled")]
 	ProtocolNotEnabled(Protocol),
 }
@@ -48,182 +74,230 @@ pub enum DetectionError {
 pub type DetectionResult<T> = Result<T, DetectionError>;
 
 /// Supported protocols for detection.
-///
-/// Each variant corresponds to a feature flag. If the feature is not enabled,
-/// the variant will be unavailable at compile time.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum Protocol {
-	/// HTTP protocol (matches GET, POST, etc., or HTTP/1.x, HTTP/2 response headers).
+	/// HTTP protocol.
 	#[cfg(feature = "http")]
 	Http,
-	/// IMAP protocol (Internet Message Access Protocol).
-	#[cfg(feature = "imap")]
-	Imap,
-	/// TLS protocol (SSL/TLS record layer detection).
+	/// TLS protocol.
 	#[cfg(feature = "tls")]
 	Tls,
-	/// SSH protocol (matches SSH-2.0 or SSH-1.99 identification strings).
+	/// SSH protocol.
 	#[cfg(feature = "ssh")]
 	Ssh,
-	/// STUN protocol (Session Traversal Utilities for NAT).
-	#[cfg(feature = "stun")]
-	Stun,
-	/// DNS protocol (matches both UDP and TCP DNS headers).
+	/// DNS protocol.
 	#[cfg(feature = "dns")]
 	Dns,
-	/// FTP protocol (File Transfer Protocol).
-	#[cfg(feature = "ftp")]
-	Ftp,
-	/// DHCP protocol (matches BOOTP/DHCP header).
-	#[cfg(feature = "dhcp")]
-	Dhcp,
-	/// NTP protocol (Network Time Protocol).
-	#[cfg(feature = "ntp")]
-	Ntp,
-	/// QUIC protocol (matches Initial packets with Long Header).
+	/// QUIC protocol.
 	#[cfg(feature = "quic")]
 	Quic,
-	/// MySQL protocol (matches initial Handshake phase).
+	/// MySQL protocol.
 	#[cfg(feature = "mysql")]
 	Mysql,
-	/// PostgreSQL protocol (matches StartupMessage or SSLRequest).
+	/// PostgreSQL protocol.
 	#[cfg(feature = "postgres")]
 	Postgres,
-	/// Redis protocol (RESP).
+	/// Redis protocol.
 	#[cfg(feature = "redis")]
 	Redis,
-	/// SMB protocol (Server Message Block).
-	#[cfg(feature = "smb")]
-	Smb,
-	/// SIP protocol (Session Initiation Protocol).
-	#[cfg(feature = "sip")]
-	Sip,
-	/// RTSP protocol (Real-Time Streaming Protocol).
-	#[cfg(feature = "rtsp")]
-	Rtsp,
-	/// MQTT protocol (matches CONNECT packets).
+	/// MQTT protocol.
 	#[cfg(feature = "mqtt")]
 	Mqtt,
-	/// SMTP protocol (Simple Mail Transfer Protocol).
+	/// SMTP protocol.
 	#[cfg(feature = "smtp")]
 	Smtp,
-	/// POP3 protocol (Post Office Protocol version 3).
+	/// POP3 protocol.
 	#[cfg(feature = "pop3")]
 	Pop3,
+	/// IMAP protocol.
+	#[cfg(feature = "imap")]
+	Imap,
+	/// FTP protocol.
+	#[cfg(feature = "ftp")]
+	Ftp,
+	/// SMB protocol.
+	#[cfg(feature = "smb")]
+	Smb,
+	/// STUN protocol.
+	#[cfg(feature = "stun")]
+	Stun,
+	/// SIP protocol.
+	#[cfg(feature = "sip")]
+	Sip,
+	/// RTSP protocol.
+	#[cfg(feature = "rtsp")]
+	Rtsp,
+	/// DHCP protocol.
+	#[cfg(feature = "dhcp")]
+	Dhcp,
+	/// NTP protocol.
+	#[cfg(feature = "ntp")]
+	Ntp,
 }
 
 impl Protocol {
 	/// Checks if the provided data matches this protocol.
-	///
-	/// This is a low-level API for verifying a single protocol without creating a detector.
-	///
-	/// # Errors
-	///
-	/// Returns [`DetectionError::InsufficientData`] if the data is shorter than [`Self::min_bytes`].
 	#[inline(always)]
 	pub fn detect(&self, data: &[u8]) -> DetectionResult<bool> {
-		let min = self.min_bytes();
-		if data.len() < min {
-			return Err(DetectionError::InsufficientData {
-				required: min,
-				got: data.len(),
-			});
+		Ok(matches!(self.probe(data), DetectionStatus::Match))
+	}
+
+	/// Probes the data and returns the detection status.
+	#[inline(always)]
+	pub fn probe(&self, data: &[u8]) -> DetectionStatus {
+		match self.probe_info(data) {
+			(DetectionStatus::Match, _) => DetectionStatus::Match,
+			(status, _) => status,
 		}
+	}
 
-		let matched = match self {
+	/// Probes the data and returns status plus version info.
+	#[inline(always)]
+	pub fn probe_info<'a>(&self, data: &'a [u8]) -> (DetectionStatus, ProtocolVersion<'a>) {
+		match self {
 			#[cfg(feature = "http")]
-			Self::Http => protocols::http::detect(data),
-			#[cfg(feature = "imap")]
-			Self::Imap => protocols::imap::detect(data),
+			Self::Http => protocols::http::probe(data),
 			#[cfg(feature = "tls")]
-			Self::Tls => protocols::tls::detect(data),
+			Self::Tls => protocols::tls::probe(data),
 			#[cfg(feature = "ssh")]
-			Self::Ssh => protocols::ssh::detect(data),
-			#[cfg(feature = "stun")]
-			Self::Stun => protocols::stun::detect(data),
-			#[cfg(feature = "dns")]
-			Self::Dns => protocols::dns::detect(data),
-			#[cfg(feature = "ftp")]
-			Self::Ftp => protocols::ftp::detect(data),
-			#[cfg(feature = "dhcp")]
-			Self::Dhcp => protocols::dhcp::detect(data),
-			#[cfg(feature = "ntp")]
-			Self::Ntp => protocols::ntp::detect(data),
-			#[cfg(feature = "quic")]
-			Self::Quic => protocols::quic::detect(data),
-			#[cfg(feature = "mysql")]
-			Self::Mysql => protocols::mysql::detect(data),
-			#[cfg(feature = "postgres")]
-			Self::Postgres => protocols::postgres::detect(data),
+			Self::Ssh => protocols::ssh::probe(data),
 			#[cfg(feature = "redis")]
-			Self::Redis => protocols::redis::detect(data),
-			#[cfg(feature = "smb")]
-			Self::Smb => protocols::smb::detect(data),
-			#[cfg(feature = "sip")]
-			Self::Sip => protocols::sip::detect(data),
-			#[cfg(feature = "rtsp")]
-			Self::Rtsp => protocols::rtsp::detect(data),
+			Self::Redis => protocols::redis::probe(data),
+			#[cfg(feature = "dns")]
+			Self::Dns => (
+				bool_to_status(protocols::dns::detect(data)),
+				ProtocolVersion::Unknown,
+			),
+			#[cfg(feature = "quic")]
+			Self::Quic => (
+				bool_to_status(protocols::quic::detect(data)),
+				ProtocolVersion::Unknown,
+			),
+			#[cfg(feature = "mysql")]
+			Self::Mysql => (
+				bool_to_status(protocols::mysql::detect(data)),
+				ProtocolVersion::Unknown,
+			),
+			#[cfg(feature = "postgres")]
+			Self::Postgres => (
+				bool_to_status(protocols::postgres::detect(data)),
+				ProtocolVersion::Unknown,
+			),
 			#[cfg(feature = "mqtt")]
-			Self::Mqtt => protocols::mqtt::detect(data),
+			Self::Mqtt => (
+				bool_to_status(protocols::mqtt::detect(data)),
+				ProtocolVersion::Unknown,
+			),
 			#[cfg(feature = "smtp")]
-			Self::Smtp => protocols::smtp::detect(data),
+			Self::Smtp => (
+				bool_to_status(protocols::smtp::detect(data)),
+				ProtocolVersion::Unknown,
+			),
 			#[cfg(feature = "pop3")]
-			Self::Pop3 => protocols::pop3::detect(data),
+			Self::Pop3 => (
+				bool_to_status(protocols::pop3::detect(data)),
+				ProtocolVersion::Unknown,
+			),
+			#[cfg(feature = "imap")]
+			Self::Imap => (
+				bool_to_status(protocols::imap::detect(data)),
+				ProtocolVersion::Unknown,
+			),
+			#[cfg(feature = "ftp")]
+			Self::Ftp => (
+				bool_to_status(protocols::ftp::detect(data)),
+				ProtocolVersion::Unknown,
+			),
+			#[cfg(feature = "smb")]
+			Self::Smb => (
+				bool_to_status(protocols::smb::detect(data)),
+				ProtocolVersion::Unknown,
+			),
+			#[cfg(feature = "stun")]
+			Self::Stun => (
+				bool_to_status(protocols::stun::detect(data)),
+				ProtocolVersion::Unknown,
+			),
+			#[cfg(feature = "sip")]
+			Self::Sip => (
+				bool_to_status(protocols::sip::detect(data)),
+				ProtocolVersion::Unknown,
+			),
+			#[cfg(feature = "rtsp")]
+			Self::Rtsp => (
+				bool_to_status(protocols::rtsp::detect(data)),
+				ProtocolVersion::Unknown,
+			),
+			#[cfg(feature = "dhcp")]
+			Self::Dhcp => (
+				bool_to_status(protocols::dhcp::detect(data)),
+				ProtocolVersion::Unknown,
+			),
+			#[cfg(feature = "ntp")]
+			Self::Ntp => (
+				bool_to_status(protocols::ntp::detect(data)),
+				ProtocolVersion::Unknown,
+			),
 			#[allow(unreachable_patterns)]
-			_ => false,
-		};
-
-		Ok(matched)
+			_ => (DetectionStatus::NoMatch, ProtocolVersion::Unknown),
+		}
 	}
 
 	/// Returns the minimum number of bytes required to identify this protocol.
-	///
-	/// For most protocols, this is between 4 and 12 bytes.
 	#[inline(always)]
 	#[must_use]
 	pub const fn min_bytes(&self) -> usize {
 		match self {
 			#[cfg(feature = "http")]
 			Self::Http => 4,
-			#[cfg(feature = "imap")]
-			Self::Imap => 5,
 			#[cfg(feature = "tls")]
 			Self::Tls => 5,
 			#[cfg(feature = "ssh")]
 			Self::Ssh => 4,
-			#[cfg(feature = "stun")]
-			Self::Stun => 20,
 			#[cfg(feature = "dns")]
-			Self::Dns => 12, // For UDP, TCP needs 14 but we handle it
-			#[cfg(feature = "ftp")]
-			Self::Ftp => 5,
-			#[cfg(feature = "dhcp")]
-			Self::Dhcp => 44,
-			#[cfg(feature = "ntp")]
-			Self::Ntp => 48,
+			Self::Dns => 12,
 			#[cfg(feature = "quic")]
-			Self::Quic => 5,
+			Self::Quic => 7,
 			#[cfg(feature = "mysql")]
-			Self::Mysql => 5,
+			Self::Mysql => 10,
 			#[cfg(feature = "postgres")]
 			Self::Postgres => 8,
 			#[cfg(feature = "redis")]
 			Self::Redis => 1,
-			#[cfg(feature = "smb")]
-			Self::Smb => 4,
-			#[cfg(feature = "sip")]
-			Self::Sip => 12,
-			#[cfg(feature = "rtsp")]
-			Self::Rtsp => 14,
 			#[cfg(feature = "mqtt")]
-			Self::Mqtt => 7,
+			Self::Mqtt => 12,
 			#[cfg(feature = "smtp")]
 			Self::Smtp => 5,
 			#[cfg(feature = "pop3")]
 			Self::Pop3 => 5,
+			#[cfg(feature = "imap")]
+			Self::Imap => 5,
+			#[cfg(feature = "ftp")]
+			Self::Ftp => 5,
+			#[cfg(feature = "smb")]
+			Self::Smb => 4,
+			#[cfg(feature = "stun")]
+			Self::Stun => 20,
+			#[cfg(feature = "sip")]
+			Self::Sip => 12,
+			#[cfg(feature = "rtsp")]
+			Self::Rtsp => 14,
+			#[cfg(feature = "dhcp")]
+			Self::Dhcp => 44,
+			#[cfg(feature = "ntp")]
+			Self::Ntp => 48,
 			#[allow(unreachable_patterns)]
-			_ => 1, // Fallback for when no features are enabled
+			_ => 1,
 		}
+	}
+}
+
+#[inline(always)]
+fn bool_to_status(b: bool) -> DetectionStatus {
+	if b {
+		DetectionStatus::Match
+	} else {
+		DetectionStatus::NoMatch
 	}
 }
