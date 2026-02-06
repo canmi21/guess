@@ -1,0 +1,20 @@
+/* src/protocols/mod.rs */
+
+#[cfg(feature = "dns")]
+pub(crate) mod dns;
+#[cfg(feature = "http")]
+pub(crate) mod http;
+#[cfg(feature = "mqtt")]
+pub(crate) mod mqtt;
+#[cfg(feature = "mysql")]
+pub(crate) mod mysql;
+#[cfg(feature = "postgres")]
+pub(crate) mod postgres;
+#[cfg(feature = "quic")]
+pub(crate) mod quic;
+#[cfg(feature = "redis")]
+pub(crate) mod redis;
+#[cfg(feature = "ssh")]
+pub(crate) mod ssh;
+#[cfg(feature = "tls")]
+pub(crate) mod tls;
