@@ -1,0 +1,12 @@
+{
+  "scripts": {
+    "publish": "cargo publish",
+    "clean": "cargo clean",
+    "build": "cargo build",
+    "install": "cargo install --path .",
+    "add": "cargo add",
+    "lint": "cargo fmt --all",
+    "dev": "cargo run",
+    "remove": "cargo remove"
+  }
+}
