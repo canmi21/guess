@@ -29,14 +29,24 @@ pub struct ProtocolDetector<Transport = Unknown> {
 #[allow(dead_code)]
 pub(crate) struct ProtocolSet {
 	pub http: bool,
+	pub imap: bool,
+	pub ftp: bool,
 	pub tls: bool,
 	pub ssh: bool,
+	pub stun: bool,
 	pub dns: bool,
+	pub dhcp: bool,
+	pub ntp: bool,
 	pub quic: bool,
 	pub mysql: bool,
 	pub postgres: bool,
 	pub redis: bool,
+	pub smb: bool,
+	pub sip: bool,
+	pub rtsp: bool,
 	pub mqtt: bool,
+	pub smtp: bool,
+	pub pop3: bool,
 }
 
 impl ProtocolSet {
@@ -50,6 +60,14 @@ impl ProtocolSet {
 		if self.http {
 			max = max.max(Protocol::Http.min_bytes());
 		}
+		#[cfg(feature = "imap")]
+		if self.imap {
+			max = max.max(Protocol::Imap.min_bytes());
+		}
+		#[cfg(feature = "ftp")]
+		if self.ftp {
+			max = max.max(Protocol::Ftp.min_bytes());
+		}
 		#[cfg(feature = "tls")]
 		if self.tls {
 			max = max.max(Protocol::Tls.min_bytes());
@@ -58,9 +76,21 @@ impl ProtocolSet {
 		if self.ssh {
 			max = max.max(Protocol::Ssh.min_bytes());
 		}
+		#[cfg(feature = "stun")]
+		if self.stun {
+			max = max.max(Protocol::Stun.min_bytes());
+		}
 		#[cfg(feature = "dns")]
 		if self.dns {
 			max = max.max(Protocol::Dns.min_bytes());
+		}
+		#[cfg(feature = "dhcp")]
+		if self.dhcp {
+			max = max.max(Protocol::Dhcp.min_bytes());
+		}
+		#[cfg(feature = "ntp")]
+		if self.ntp {
+			max = max.max(Protocol::Ntp.min_bytes());
 		}
 		#[cfg(feature = "quic")]
 		if self.quic {
@@ -78,9 +108,29 @@ impl ProtocolSet {
 		if self.redis {
 			max = max.max(Protocol::Redis.min_bytes());
 		}
+		#[cfg(feature = "smb")]
+		if self.smb {
+			max = max.max(Protocol::Smb.min_bytes());
+		}
+		#[cfg(feature = "sip")]
+		if self.sip {
+			max = max.max(Protocol::Sip.min_bytes());
+		}
+		#[cfg(feature = "rtsp")]
+		if self.rtsp {
+			max = max.max(Protocol::Rtsp.min_bytes());
+		}
 		#[cfg(feature = "mqtt")]
 		if self.mqtt {
 			max = max.max(Protocol::Mqtt.min_bytes());
+		}
+		#[cfg(feature = "smtp")]
+		if self.smtp {
+			max = max.max(Protocol::Smtp.min_bytes());
+		}
+		#[cfg(feature = "pop3")]
+		if self.pop3 {
+			max = max.max(Protocol::Pop3.min_bytes());
 		}
 
 		if max == 0 { 1 } else { max }
@@ -165,6 +215,18 @@ impl ProtocolDetector<Unknown> {
 		if self.enabled.ssh && ssh::detect(data) {
 			return Ok(Some(Protocol::Ssh));
 		}
+		#[cfg(feature = "sip")]
+		if self.enabled.sip && sip::detect(data) {
+			return Ok(Some(Protocol::Sip));
+		}
+		#[cfg(feature = "rtsp")]
+		if self.enabled.rtsp && rtsp::detect(data) {
+			return Ok(Some(Protocol::Rtsp));
+		}
+		#[cfg(feature = "imap")]
+		if self.enabled.imap && imap::detect(data) {
+			return Ok(Some(Protocol::Imap));
+		}
 		#[cfg(feature = "tls")]
 		if self.enabled.tls && tls::detect(data) {
 			return Ok(Some(Protocol::Tls));
@@ -176,6 +238,18 @@ impl ProtocolDetector<Unknown> {
 		#[cfg(feature = "dns")]
 		if self.enabled.dns && dns::detect(data) {
 			return Ok(Some(Protocol::Dns));
+		}
+		#[cfg(feature = "ftp")]
+		if self.enabled.ftp && ftp::detect(data) {
+			return Ok(Some(Protocol::Ftp));
+		}
+		#[cfg(feature = "dhcp")]
+		if self.enabled.dhcp && dhcp::detect(data) {
+			return Ok(Some(Protocol::Dhcp));
+		}
+		#[cfg(feature = "ntp")]
+		if self.enabled.ntp && ntp::detect(data) {
+			return Ok(Some(Protocol::Ntp));
 		}
 		#[cfg(feature = "quic")]
 		if self.enabled.quic && quic::detect(data) {
@@ -196,6 +270,19 @@ impl ProtocolDetector<Unknown> {
 		#[cfg(feature = "mqtt")]
 		if self.enabled.mqtt && mqtt::detect(data) {
 			return Ok(Some(Protocol::Mqtt));
+		}
+		#[cfg(feature = "smtp")]
+		if self.enabled.smtp && smtp::detect(data) {
+			return Ok(Some(Protocol::Smtp));
+		}
+		#[cfg(feature = "pop3")]
+		if self.enabled.pop3 && pop3::detect(data) {
+			return Ok(Some(Protocol::Pop3));
+		}
+
+		#[cfg(feature = "smb")]
+		if self.enabled.smb && smb::detect(data) {
+			return Ok(Some(Protocol::Smb));
 		}
 
 		let _ = data; // Prevent unused_variables warning
@@ -218,6 +305,14 @@ impl ProtocolDetector<Unknown> {
 		if Protocol::Ssh.detect(data) == Ok(true) {
 			results.push(Protocol::Ssh);
 		}
+		#[cfg(feature = "stun")]
+		if Protocol::Stun.detect(data) == Ok(true) {
+			results.push(Protocol::Stun);
+		}
+		#[cfg(feature = "imap")]
+		if Protocol::Imap.detect(data) == Ok(true) {
+			results.push(Protocol::Imap);
+		}
 		#[cfg(feature = "tls")]
 		if Protocol::Tls.detect(data) == Ok(true) {
 			results.push(Protocol::Tls);
@@ -229,6 +324,18 @@ impl ProtocolDetector<Unknown> {
 		#[cfg(feature = "dns")]
 		if Protocol::Dns.detect(data) == Ok(true) {
 			results.push(Protocol::Dns);
+		}
+		#[cfg(feature = "ftp")]
+		if Protocol::Ftp.detect(data) == Ok(true) {
+			results.push(Protocol::Ftp);
+		}
+		#[cfg(feature = "dhcp")]
+		if Protocol::Dhcp.detect(data) == Ok(true) {
+			results.push(Protocol::Dhcp);
+		}
+		#[cfg(feature = "ntp")]
+		if Protocol::Ntp.detect(data) == Ok(true) {
+			results.push(Protocol::Ntp);
 		}
 		#[cfg(feature = "quic")]
 		if Protocol::Quic.detect(data) == Ok(true) {
@@ -246,9 +353,33 @@ impl ProtocolDetector<Unknown> {
 		if Protocol::Redis.detect(data) == Ok(true) {
 			results.push(Protocol::Redis);
 		}
+		#[cfg(feature = "smb")]
+		if Protocol::Smb.detect(data) == Ok(true) {
+			results.push(Protocol::Smb);
+		}
+		#[cfg(feature = "sip")]
+		if Protocol::Sip.detect(data) == Ok(true) {
+			results.push(Protocol::Sip);
+		}
 		#[cfg(feature = "mqtt")]
 		if Protocol::Mqtt.detect(data) == Ok(true) {
 			results.push(Protocol::Mqtt);
+		}
+		#[cfg(feature = "smtp")]
+		if Protocol::Smtp.detect(data) == Ok(true) {
+			results.push(Protocol::Smtp);
+		}
+		#[cfg(feature = "pop3")]
+		if Protocol::Pop3.detect(data) == Ok(true) {
+			results.push(Protocol::Pop3);
+		}
+		#[cfg(feature = "sip")]
+		if Protocol::Sip.detect(data) == Ok(true) {
+			results.push(Protocol::Sip);
+		}
+		#[cfg(feature = "rtsp")]
+		if Protocol::Rtsp.detect(data) == Ok(true) {
+			results.push(Protocol::Rtsp);
 		}
 
 		let _ = data;
@@ -275,12 +406,22 @@ impl<T> ProtocolDetector<T> {
 			match p {
 				#[cfg(feature = "http")]
 				Protocol::Http => enabled.http = true,
+				#[cfg(feature = "imap")]
+				Protocol::Imap => enabled.imap = true,
 				#[cfg(feature = "tls")]
 				Protocol::Tls => enabled.tls = true,
 				#[cfg(feature = "ssh")]
 				Protocol::Ssh => enabled.ssh = true,
+				#[cfg(feature = "stun")]
+				Protocol::Stun => enabled.stun = true,
 				#[cfg(feature = "dns")]
 				Protocol::Dns => enabled.dns = true,
+				#[cfg(feature = "ftp")]
+				Protocol::Ftp => enabled.ftp = true,
+				#[cfg(feature = "dhcp")]
+				Protocol::Dhcp => enabled.dhcp = true,
+				#[cfg(feature = "ntp")]
+				Protocol::Ntp => enabled.ntp = true,
 				#[cfg(feature = "quic")]
 				Protocol::Quic => enabled.quic = true,
 				#[cfg(feature = "mysql")]
@@ -289,8 +430,18 @@ impl<T> ProtocolDetector<T> {
 				Protocol::Postgres => enabled.postgres = true,
 				#[cfg(feature = "redis")]
 				Protocol::Redis => enabled.redis = true,
+				#[cfg(feature = "smb")]
+				Protocol::Smb => enabled.smb = true,
+				#[cfg(feature = "sip")]
+				Protocol::Sip => enabled.sip = true,
+				#[cfg(feature = "rtsp")]
+				Protocol::Rtsp => enabled.rtsp = true,
 				#[cfg(feature = "mqtt")]
 				Protocol::Mqtt => enabled.mqtt = true,
+				#[cfg(feature = "smtp")]
+				Protocol::Smtp => enabled.smtp = true,
+				#[cfg(feature = "pop3")]
+				Protocol::Pop3 => enabled.pop3 = true,
 				#[allow(unreachable_patterns)]
 				_ => {}
 			}
@@ -350,6 +501,18 @@ impl ProtocolDetector<Tcp> {
 		if self.enabled.ssh && ssh::detect(data) {
 			return Ok(Some(Protocol::Ssh));
 		}
+		#[cfg(feature = "sip")]
+		if self.enabled.sip && sip::detect(data) {
+			return Ok(Some(Protocol::Sip));
+		}
+		#[cfg(feature = "rtsp")]
+		if self.enabled.rtsp && rtsp::detect(data) {
+			return Ok(Some(Protocol::Rtsp));
+		}
+		#[cfg(feature = "imap")]
+		if self.enabled.imap && imap::detect(data) {
+			return Ok(Some(Protocol::Imap));
+		}
 		#[cfg(feature = "tls")]
 		if self.enabled.tls && tls::detect(data) {
 			return Ok(Some(Protocol::Tls));
@@ -357,6 +520,10 @@ impl ProtocolDetector<Tcp> {
 		#[cfg(feature = "http")]
 		if self.enabled.http && http::detect(data) {
 			return Ok(Some(Protocol::Http));
+		}
+		#[cfg(feature = "ftp")]
+		if self.enabled.ftp && ftp::detect(data) {
+			return Ok(Some(Protocol::Ftp));
 		}
 		#[cfg(feature = "mysql")]
 		if self.enabled.mysql && mysql::detect(data) {
@@ -373,6 +540,14 @@ impl ProtocolDetector<Tcp> {
 		#[cfg(feature = "mqtt")]
 		if self.enabled.mqtt && mqtt::detect(data) {
 			return Ok(Some(Protocol::Mqtt));
+		}
+		#[cfg(feature = "smtp")]
+		if self.enabled.smtp && smtp::detect(data) {
+			return Ok(Some(Protocol::Smtp));
+		}
+		#[cfg(feature = "pop3")]
+		if self.enabled.pop3 && pop3::detect(data) {
+			return Ok(Some(Protocol::Pop3));
 		}
 
 		let _ = data;
@@ -432,22 +607,55 @@ impl ProtocolDetector<Udp> {
 		if self.enabled.dns && dns::detect(data) {
 			return Ok(Some(Protocol::Dns));
 		}
+		#[cfg(feature = "stun")]
+		if self.enabled.stun && stun::detect(data) {
+			return Ok(Some(Protocol::Stun));
+		}
+		#[cfg(feature = "dhcp")]
+		if self.enabled.dhcp && dhcp::detect(data) {
+			return Ok(Some(Protocol::Dhcp));
+		}
+		#[cfg(feature = "ntp")]
+		if self.enabled.ntp && ntp::detect(data) {
+			return Ok(Some(Protocol::Ntp));
+		}
 		#[cfg(feature = "quic")]
 		if self.enabled.quic && quic::detect(data) {
 			return Ok(Some(Protocol::Quic));
+		}
+		#[cfg(feature = "sip")]
+		if self.enabled.sip && sip::detect(data) {
+			return Ok(Some(Protocol::Sip));
+		}
+		#[cfg(feature = "rtsp")]
+		if self.enabled.rtsp && rtsp::detect(data) {
+			return Ok(Some(Protocol::Rtsp));
 		}
 
 		let _ = data;
 		Ok(None)
 	}
 
-	/// Creates a detector for common UDP protocols (DNS, QUIC).
-	#[cfg(all(feature = "dns", feature = "quic"))]
+	/// Creates a detector for common UDP protocols (DNS, DHCP, NTP, QUIC, STUN, SIP, RTSP).
+	#[cfg(all(
+		feature = "dns",
+		feature = "dhcp",
+		feature = "ntp",
+		feature = "quic",
+		feature = "stun",
+		feature = "sip",
+		feature = "rtsp"
+	))]
 	#[must_use]
 	pub fn common() -> Self {
 		let enabled = ProtocolSet {
 			dns: true,
+			dhcp: true,
+			ntp: true,
 			quic: true,
+			stun: true,
+			sip: true,
+			rtsp: true,
 			..ProtocolSet::default()
 		};
 		Self::new(enabled, crate::MAX_INSPECT_BYTES)
