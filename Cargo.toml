@@ -1,7 +1,7 @@
 [package]
 name = "guess"
 license = "MIT"
-version = "0.0.3"
+version = "0.1.3"
 edition = "2024"
 rust-version = "1.93"
 categories = ["network-programming", "parser-implementations", "no-std"]
@@ -24,25 +24,35 @@ tracing = ["dep:tracing"]
 
 # Protocols
 http = []
+imap = []
 tls = []
 ssh = []
 dns = []
+dhcp = []
+ftp = []
+ntp = []
 quic = []
+stun = []
 mysql = []
 postgres = []
 redis = []
 mqtt = []
+smtp = []
+pop3 = []
+smb = []
+sip = []
+rtsp = []
 
 # Group Features
 web = ["http", "tls", "quic"]
 db = ["mysql", "postgres", "redis"]
 
 # Transport Layer Groups
-tcp = ["http", "tls", "ssh", "mysql", "postgres", "redis", "mqtt"]
-udp = ["dns", "quic"]
+tcp = ["http", "imap", "tls", "ssh", "mysql", "postgres", "redis", "mqtt", "smtp", "pop3", "ftp", "smb", "sip", "rtsp"]
+udp = ["dns", "dhcp", "ntp", "quic", "stun", "sip", "rtsp"]
 
 # All
-full = ["tcp", "udp", "web", "db", "tracing", "std"]
+full = ["tcp", "udp", "web", "db", "tracing", "std", "smtp", "pop3", "imap", "ftp", "smb", "stun", "sip", "rtsp"]
 
 [dev-dependencies]
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
