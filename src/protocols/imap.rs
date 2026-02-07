@@ -1,17 +1,12 @@
 /* src/protocols/imap.rs */
 
 /// Detects IMAP protocol (Internet Message Access Protocol).
-///
-/// IMAP starts with a server greeting or a client tagged command.
-/// Server Greeting: "* OK ...", "* PREAUTH ...", "* BYE ..."
-/// Client Command: "A001 CAPABILITY", "1 LOGIN user pass"
 #[inline(always)]
 pub(crate) fn detect(data: &[u8]) -> bool {
 	if data.len() < 5 {
 		return false;
 	}
 
-	// 1. Detect Server Greeting or Untagged Response
 	if data.starts_with(b"* ") {
 		let after_star = &data[2..];
 		if after_star.starts_with(b"OK ")
@@ -24,19 +19,14 @@ pub(crate) fn detect(data: &[u8]) -> bool {
 		}
 	}
 
-	// 2. Detect Client Tagged Command
-	// Format: <tag> <command> ...
-	// Tag is an alphanumeric string (can include '.', '_', '-').
 	let mut i = 0;
 	while i < data.len() && i < 20 && is_tag_char(data[i]) {
 		i += 1;
 	}
 
-	// Tag must be followed by a space and then a command.
 	if i > 0 && i + 1 < data.len() && data[i] == b' ' {
 		let cmd_start = i + 1;
 		let mut j = cmd_start;
-		// IMAP commands are usually uppercase letters.
 		while j < data.len() && j < cmd_start + 16 && data[j].is_ascii_uppercase() {
 			j += 1;
 		}
@@ -53,11 +43,13 @@ pub(crate) fn detect(data: &[u8]) -> bool {
 	false
 }
 
+/// Checks if a character is valid in an IMAP tag.
 #[inline(always)]
 fn is_tag_char(b: u8) -> bool {
 	b.is_ascii_alphanumeric() || b == b'.' || b == b'_' || b == b'-'
 }
 
+/// Checks if a byte slice is a known IMAP command.
 #[inline(always)]
 fn is_imap_command(cmd: &[u8]) -> bool {
 	matches!(
@@ -94,6 +86,7 @@ fn is_imap_command(cmd: &[u8]) -> bool {
 	)
 }
 
+/// Validates that the data looks like a printable ASCII line.
 #[inline(always)]
 fn validate_line(data: &[u8]) -> bool {
 	let limit = data.len().min(64);
@@ -104,7 +97,7 @@ fn validate_line(data: &[u8]) -> bool {
 			found_newline = true;
 			break;
 		}
-		if b != b'\r' && b != b'\t' && (b < 32 || b > 126) {
+		if b != b'\r' && b != b'\t' && !(32..=126).contains(&b) {
 			return false;
 		}
 	}
@@ -138,7 +131,6 @@ mod tests {
 
 	#[test]
 	fn test_reject_redis_array_collision() {
-		// Redis uses *<count>\r\n, IMAP uses * <TYPE>
 		assert!(!detect(b"*3\r\n$3\r\nGET\r\n"));
 	}
 
@@ -153,7 +145,7 @@ mod tests {
 	fn test_reject_non_ascii() {
 		let mut data = [0u8; 12];
 		data[..5].copy_from_slice(b"* OK ");
-		data[5..].copy_from_slice(&[0xFF, 0x00, 0x12, 0x34, 0x56, 0x78, 0x90]);
+		data[5..12].copy_from_slice(&[0xFF, 0x00, 0x12, 0x34, 0x56, 0x78, 0x90]);
 		assert!(!detect(&data));
 	}
 

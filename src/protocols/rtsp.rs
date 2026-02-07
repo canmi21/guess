@@ -1,23 +1,16 @@
 /* src/protocols/rtsp.rs */
 
 /// Detects RTSP protocol (Real-Time Streaming Protocol).
-///
-/// RTSP messages are text-based and start with either a Request-Line or a Status-Line.
-/// Status-Line: "RTSP/1.0 200 OK\r\n"
-/// Request-Line: "DESCRIBE rtsp://example.com/media.mp4 RTSP/1.0\r\n"
 #[inline(always)]
 pub(crate) fn detect(data: &[u8]) -> bool {
-	// Minimum length for a basic status line or request: "RTSP/1.0 200 OK\n" (16 bytes)
 	if data.len() < 14 {
 		return false;
 	}
 
-	// 1. Detect Status-Line (Server Response)
 	if data.starts_with(b"RTSP/1.0 ") || data.starts_with(b"RTSP/2.0 ") {
 		return validate_rtsp_line(data, true);
 	}
 
-	// 2. Detect Request-Line (Client Request)
 	if is_rtsp_request(data) {
 		return validate_rtsp_line(data, false);
 	}
@@ -25,6 +18,7 @@ pub(crate) fn detect(data: &[u8]) -> bool {
 	false
 }
 
+/// Checks if the data starts with a known RTSP method.
 #[inline(always)]
 fn is_rtsp_request(data: &[u8]) -> bool {
 	match data[0] {
@@ -47,27 +41,23 @@ fn validate_rtsp_line(data: &[u8], is_response: bool) -> bool {
 	let mut found_version = is_response;
 	let mut end_of_line = limit;
 
-	for i in 0..limit {
-		let b = data[i];
+	for (i, &b) in data.iter().enumerate().take(limit) {
 		if b == b'\n' || b == b'\r' {
 			end_of_line = i;
 			break;
 		}
-		if b < 32 || b > 126 {
+		if !(32..=126).contains(&b) {
 			return false;
 		}
 	}
 
-	if !found_version {
+	if !found_version && end_of_line > 9 {
 		let line = &data[..end_of_line];
-		// Search for " RTSP/1.0" or " RTSP/2.0" suffix in the request line.
-		if line.len() > 9 {
-			for i in 0..=(line.len() - 9) {
-				let sub = &line[i..i + 9];
-				if sub == b" RTSP/1.0" || sub == b" RTSP/2.0" {
-					found_version = true;
-					break;
-				}
+		for i in 0..=(line.len() - 9) {
+			let sub = &line[i..i + 9];
+			if sub == b" RTSP/1.0" || sub == b" RTSP/2.0" {
+				found_version = true;
+				break;
 			}
 		}
 	}
@@ -96,7 +86,7 @@ mod tests {
 
 	#[test]
 	fn test_detect_rtsp_partial() {
-		assert!(detect(b"DESCRIBE rtsp://server.com/media RTSP/1.0"));
+		assert!(detect(b"DESCRIBE <rtsp://server.com/media> RTSP/1.0"));
 	}
 
 	#[test]
@@ -115,9 +105,7 @@ mod tests {
 	fn test_reject_non_ascii() {
 		let mut data = [0u8; 20];
 		data[..9].copy_from_slice(b"RTSP/1.0 ");
-		data[9..].copy_from_slice(&[
-			0xFF, 0x00, 0x12, 0x34, 0x56, 0x78, 0x90, 0x11, 0x22, 0x33, 0x44,
-		]);
+		data[9..15].copy_from_slice(&[0xFF, 0x00, 0x12, 0x34, 0x56, 0x78]);
 		assert!(!detect(&data));
 	}
 

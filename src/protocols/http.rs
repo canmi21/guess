@@ -1,7 +1,7 @@
 /* src/protocols/http.rs */
-
 use crate::{DetectionStatus, ProtocolVersion};
 
+/// Probes for HTTP protocol and version.
 #[inline(always)]
 pub(crate) fn probe(data: &[u8]) -> (DetectionStatus, ProtocolVersion<'_>) {
 	if data.len() < 4 {
@@ -21,11 +21,10 @@ pub(crate) fn probe(data: &[u8]) -> (DetectionStatus, ProtocolVersion<'_>) {
 	// HTTP/1.x Methods
 	let is_method = matches!(data[0], b'G' | b'P' | b'D' | b'H' | b'O' | b'C' | b'T');
 	if is_method {
-		// Check for " HTTP/1.1" or " HTTP/1.0" in the first line
 		let limit = data.len().min(64);
 		let mut eol = limit;
-		for i in 0..limit {
-			if data[i] == b'\n' {
+		for (i, &b) in data.iter().enumerate().take(limit) {
+			if b == b'\n' {
 				eol = i;
 				break;
 			}
@@ -44,7 +43,6 @@ pub(crate) fn probe(data: &[u8]) -> (DetectionStatus, ProtocolVersion<'_>) {
 			return (DetectionStatus::Incomplete, ProtocolVersion::Unknown);
 		}
 
-		// If we haven't found the version but have a method prefix
 		if is_likely_http_method(data) {
 			return (DetectionStatus::Incomplete, ProtocolVersion::Unknown);
 		}
@@ -53,6 +51,7 @@ pub(crate) fn probe(data: &[u8]) -> (DetectionStatus, ProtocolVersion<'_>) {
 	(DetectionStatus::NoMatch, ProtocolVersion::Unknown)
 }
 
+/// Helper to check for common HTTP methods.
 #[inline(always)]
 fn is_likely_http_method(data: &[u8]) -> bool {
 	data.starts_with(b"GET ")
@@ -64,6 +63,7 @@ fn is_likely_http_method(data: &[u8]) -> bool {
 		|| data.starts_with(b"CONNECT ")
 }
 
+/// Helper to find a substring in a byte slice.
 #[inline(always)]
 fn find_sub(data: &[u8], sub: &[u8]) -> Option<usize> {
 	if sub.len() > data.len() {
@@ -75,9 +75,4 @@ fn find_sub(data: &[u8], sub: &[u8]) -> Option<usize> {
 		}
 	}
 	None
-}
-
-// Keep the old detect for compatibility
-pub(crate) fn detect(data: &[u8]) -> bool {
-	matches!(probe(data).0, DetectionStatus::Match)
 }

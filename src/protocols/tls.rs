@@ -1,7 +1,7 @@
 /* src/protocols/tls.rs */
-
 use crate::{DetectionStatus, ProtocolVersion};
 
+/// Probes for TLS protocol and version.
 #[inline(always)]
 pub(crate) fn probe(data: &[u8]) -> (DetectionStatus, ProtocolVersion<'_>) {
 	if data.len() < 5 {
@@ -19,12 +19,10 @@ pub(crate) fn probe(data: &[u8]) -> (DetectionStatus, ProtocolVersion<'_>) {
 		);
 	}
 
-	// ContentType: 0x14-0x17
 	if !(0x14..=0x17).contains(&data[0]) {
 		return (DetectionStatus::NoMatch, ProtocolVersion::Unknown);
 	}
 
-	// Version Major must be 3
 	if data[1] != 0x03 {
 		return (DetectionStatus::NoMatch, ProtocolVersion::Unknown);
 	}
@@ -33,7 +31,7 @@ pub(crate) fn probe(data: &[u8]) -> (DetectionStatus, ProtocolVersion<'_>) {
 		0x00 => "3.0",
 		0x01 => "1.0",
 		0x02 => "1.1",
-		0x03 => "1.2", // Also used for TLS 1.3 in record layer
+		0x03 => "1.2",
 		0x04 => "1.3",
 		_ => return (DetectionStatus::NoMatch, ProtocolVersion::Unknown),
 	};
@@ -43,12 +41,9 @@ pub(crate) fn probe(data: &[u8]) -> (DetectionStatus, ProtocolVersion<'_>) {
 		return (DetectionStatus::NoMatch, ProtocolVersion::Unknown);
 	}
 
-	// For Handshake (0x16), try to see ClientHello version
 	if data[0] == 0x16 && data.len() >= 11 {
 		let hs_type = data[5];
 		if hs_type == 0x01 {
-			// ClientHello
-			// The version in ClientHello is at offset 9
 			let client_version = match (data[9], data[10]) {
 				(0x03, 0x03) => "1.2",
 				(0x03, 0x04) => "1.3",
@@ -64,6 +59,7 @@ pub(crate) fn probe(data: &[u8]) -> (DetectionStatus, ProtocolVersion<'_>) {
 	(DetectionStatus::Match, ProtocolVersion::Tls(record_version))
 }
 
+/// Helper to detect legacy `SSLv2` `ClientHello`.
 fn detect_sslv2(data: &[u8]) -> bool {
 	if data.len() < 11 {
 		return false;
@@ -72,12 +68,5 @@ fn detect_sslv2(data: &[u8]) -> bool {
 		return false;
 	}
 	let record_length = (u16::from(data[0] & 0x7F) << 8) | u16::from(data[1]);
-	if record_length < 9 {
-		return false;
-	}
-	true
-}
-
-pub(crate) fn detect(data: &[u8]) -> bool {
-	matches!(probe(data).0, DetectionStatus::Match)
+	record_length >= 9
 }

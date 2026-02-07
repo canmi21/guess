@@ -1,26 +1,16 @@
 /* src/protocols/pop3.rs */
 
 /// Detects POP3 protocol (Post Office Protocol version 3).
-///
-/// POP3 typically starts with a server greeting: "+OK POP3 server ready <timestamp>\r\n".
-/// Client commands like USER, PASS, STAT also follow a predictable ASCII pattern.
 #[inline(always)]
 pub(crate) fn detect(data: &[u8]) -> bool {
-	// Minimum length for a basic greeting: "+OK \n" (5 bytes)
 	if data.len() < 5 {
 		return false;
 	}
 
-	// 1. Detect Server Response
-	// POP3 server greetings and positive responses MUST start with "+OK ".
-	// Negative responses start with "-ERR ".
-	// Note: We require the space after the prefix to distinguish from Redis RESP simple strings.
 	if data.starts_with(b"+OK ") || data.starts_with(b"-ERR ") {
 		return validate_line(data);
 	}
 
-	// 2. Detect Client Commands
-	// Common commands used at the start of a session.
 	if is_command(data, b"USER")
 		|| is_command(data, b"PASS")
 		|| is_command(data, b"STAT")
@@ -45,7 +35,6 @@ fn is_command(data: &[u8], cmd: &[u8]) -> bool {
 	if data.len() == len {
 		return true;
 	}
-	// Command must be followed by a space, CR, or LF.
 	let next = data[len];
 	next == b' ' || next == b'\r' || next == b'\n'
 }
@@ -61,13 +50,11 @@ fn validate_line(data: &[u8]) -> bool {
 			found_newline = true;
 			break;
 		}
-		// Must be printable ASCII, CR, or Tab.
-		if b != b'\r' && b != b'\t' && (b < 32 || b > 126) {
+		if b != b'\r' && b != b'\t' && !(32..=126).contains(&b) {
 			return false;
 		}
 	}
 
-	// For protocol detection, a valid prefix with printable content is strong.
 	found_newline || data.len() >= 16
 }
 
@@ -99,9 +86,7 @@ mod tests {
 
 	#[test]
 	fn test_reject_redis_collision() {
-		// Redis simple string "+OK\r\n" lacks the space required for POP3 greeting.
 		assert!(!detect(b"+OK\r\n"));
-		// Redis error "-ERR\r\n" lacks the space.
 		assert!(!detect(b"-ERR\r\n"));
 	}
 
@@ -115,7 +100,7 @@ mod tests {
 	fn test_reject_non_ascii() {
 		let mut data = [0u8; 10];
 		data[..4].copy_from_slice(b"+OK ");
-		data[4..].copy_from_slice(&[0xFF, 0x00, 0x12, 0x34, 0x56, 0x78]);
+		data[4..10].copy_from_slice(&[0xFF, 0x00, 0x12, 0x34, 0x56, 0x78]);
 		assert!(!detect(&data));
 	}
 

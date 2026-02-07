@@ -1,25 +1,16 @@
 /* src/protocols/ftp.rs */
 
 /// Detects FTP protocol (File Transfer Protocol).
-///
-/// FTP starts with a server greeting (220) or a client command.
-/// Server Greeting: "220 ...", "220-..."
-/// Client Command: "USER", "PASS", "PASV", "SYST", "QUIT"
 #[inline(always)]
 pub(crate) fn detect(data: &[u8]) -> bool {
-	// Minimum length for a basic greeting or command: "220 \n" (5 bytes)
 	if data.len() < 5 {
 		return false;
 	}
 
-	// 1. Detect Server Greeting (220)
-	// Format: "220 <message> \r\n" or "220-<message>" (multi-line)
 	if data.starts_with(b"220 ") || data.starts_with(b"220-") {
 		return validate_line(data);
 	}
 
-	// 2. Detect Client Commands
-	// We check for common FTP commands that appear at the start of a session.
 	if is_command(data, b"USER")
 		|| is_command(data, b"PASS")
 		|| is_command(data, b"AUTH")
@@ -47,7 +38,6 @@ fn is_command(data: &[u8], cmd: &[u8]) -> bool {
 	if data.len() == len {
 		return true;
 	}
-	// Command must be followed by a space, CR, or LF.
 	let next = data[len];
 	next == b' ' || next == b'\r' || next == b'\n'
 }
@@ -63,13 +53,11 @@ fn validate_line(data: &[u8]) -> bool {
 			found_newline = true;
 			break;
 		}
-		// Must be printable ASCII, CR, or Tab.
-		if b != b'\r' && b != b'\t' && (b < 32 || b > 126) {
+		if b != b'\r' && b != b'\t' && !(32..=126).contains(&b) {
 			return false;
 		}
 	}
 
-	// For protocol detection, a valid prefix with printable content is strong.
 	found_newline || data.len() >= 16
 }
 
@@ -112,7 +100,7 @@ mod tests {
 	fn test_reject_non_ascii() {
 		let mut data = [0u8; 10];
 		data[..4].copy_from_slice(b"220 ");
-		data[4..].copy_from_slice(&[0xFF, 0x00, 0x12, 0x34, 0x56, 0x78]);
+		data[4..10].copy_from_slice(&[0xFF, 0x00, 0x12, 0x34, 0x56, 0x78]);
 		assert!(!detect(&data));
 	}
 

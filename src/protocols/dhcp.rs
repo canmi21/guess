@@ -62,7 +62,7 @@ pub(crate) fn detect(data: &[u8]) -> bool {
 	// If we have enough data to see the magic cookie at offset 236, check it.
 	// Magic cookie: 0x63 0x82 0x53 0x63
 	if data.len() >= 240 {
-		return &data[236..240] == &[0x63, 0x82, 0x53, 0x63];
+		return data[236..240] == [0x63, 0x82, 0x53, 0x63];
 	}
 
 	// Since we often only have 64 bytes, we rely on the header consistency above.
@@ -97,19 +97,19 @@ mod tests {
 
 	#[test]
 	fn test_reject_invalid_op() {
-		let mut data = [0u8; 64];
-		data[0] = 3; // invalid op
-		data[1] = 1;
-		data[2] = 6;
+		let data = [
+			3u8, 1, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		];
 		assert!(!detect(&data));
 	}
 
 	#[test]
 	fn test_reject_invalid_hlen() {
-		let mut data = [0u8; 64];
-		data[0] = 1;
-		data[1] = 1;
-		data[2] = 8; // hlen should be 6 for htype=1
+		let data = [
+			1u8, 1, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		];
 		assert!(!detect(&data));
 	}
 

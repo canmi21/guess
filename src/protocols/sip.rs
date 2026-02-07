@@ -1,24 +1,16 @@
 /* src/protocols/sip.rs */
 
 /// Detects SIP protocol (Session Initiation Protocol).
-///
-/// SIP messages are text-based and start with either a Request-Line or a Status-Line.
-/// Status-Line: "SIP/2.0 200 OK\r\n"
-/// Request-Line: "INVITE sip:user@domain SIP/2.0\r\n"
 #[inline(always)]
 pub(crate) fn detect(data: &[u8]) -> bool {
-	// Minimum length for a basic status line or request: "SIP/2.0 200 OK\n" (15 bytes)
 	if data.len() < 12 {
 		return false;
 	}
 
-	// 1. Detect Status-Line (Server Response)
 	if data.starts_with(b"SIP/2.0 ") {
 		return validate_sip_line(data, true);
 	}
 
-	// 2. Detect Request-Line (Client Request)
-	// Common SIP Methods
 	if is_sip_request(data) {
 		return validate_sip_line(data, false);
 	}
@@ -26,9 +18,9 @@ pub(crate) fn detect(data: &[u8]) -> bool {
 	false
 }
 
+/// Checks if the data starts with a known SIP method.
 #[inline(always)]
 fn is_sip_request(data: &[u8]) -> bool {
-	// Fast prefix check for known SIP methods
 	match data[0] {
 		b'I' => data.starts_with(b"INVITE ") || data.starts_with(b"INFO "),
 		b'A' => data.starts_with(b"ACK "),
@@ -49,30 +41,25 @@ fn is_sip_request(data: &[u8]) -> bool {
 #[inline(always)]
 fn validate_sip_line(data: &[u8], is_response: bool) -> bool {
 	let limit = data.len().min(64);
-	let mut found_version = is_response; // Already checked for response
+	let mut found_version = is_response;
 	let mut end_of_line = limit;
 
-	for i in 0..limit {
-		let b = data[i];
+	for (i, &b) in data.iter().enumerate().take(limit) {
 		if b == b'\n' || b == b'\r' {
 			end_of_line = i;
 			break;
 		}
-		if b < 32 || b > 126 {
+		if !(32..=126).contains(&b) {
 			return false;
 		}
 	}
 
-	// For requests, we must find " SIP/2.0" within the first line.
-	if !found_version {
+	if !found_version && end_of_line > 8 {
 		let line = &data[..end_of_line];
-		// Search for " SIP/2.0" suffix in the request line.
-		if line.len() > 8 {
-			for i in 0..=(line.len() - 8) {
-				if &line[i..i + 8] == b" SIP/2.0" {
-					found_version = true;
-					break;
-				}
+		for i in 0..=(line.len() - 8) {
+			if &line[i..i + 8] == b" SIP/2.0" {
+				found_version = true;
+				break;
 			}
 		}
 	}
@@ -101,21 +88,17 @@ mod tests {
 
 	#[test]
 	fn test_detect_sip_partial() {
-		// Valid prefix and version present, but line not terminated.
 		assert!(detect(b"INVITE sip:someone@somewhere.com SIP/2.0"));
 	}
 
 	#[test]
 	fn test_reject_http_collision() {
-		// HTTP starts with GET/POST but uses HTTP/1.1
 		assert!(!detect(b"GET /index.html HTTP/1.1\r\n"));
-		// HTTP response
 		assert!(!detect(b"HTTP/1.1 200 OK\r\n"));
 	}
 
 	#[test]
 	fn test_reject_wrong_method() {
-		// Method starts with correct letter but isn't SIP
 		assert!(!detect(b"INSTALL /path/to/file SIP/2.0\r\n"));
 	}
 
@@ -123,9 +106,7 @@ mod tests {
 	fn test_reject_non_ascii() {
 		let mut data = [0u8; 20];
 		data[..8].copy_from_slice(b"SIP/2.0 ");
-		data[8..].copy_from_slice(&[
-			0xFF, 0x00, 0x12, 0x34, 0x56, 0x78, 0x90, 0x11, 0x22, 0x33, 0x44, 0x55,
-		]);
+		data[8..15].copy_from_slice(&[0xFF, 0x00, 0x12, 0x34, 0x56, 0x78, 0x90]);
 		assert!(!detect(&data));
 	}
 

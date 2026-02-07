@@ -1,7 +1,7 @@
 /* src/protocols/ssh.rs */
-
 use crate::{DetectionStatus, ProtocolVersion};
 
+/// Probes for SSH protocol and version.
 #[inline(always)]
 pub(crate) fn probe(data: &[u8]) -> (DetectionStatus, ProtocolVersion<'_>) {
 	if data.len() < 4 {
@@ -16,10 +16,7 @@ pub(crate) fn probe(data: &[u8]) -> (DetectionStatus, ProtocolVersion<'_>) {
 		return (DetectionStatus::Incomplete, ProtocolVersion::Unknown);
 	}
 
-	// Extract version: SSH-2.0-... or SSH-1.99-...
-	let version_str = if data.starts_with(b"SSH-2.0-") {
-		"2.0"
-	} else if data.starts_with(b"SSH-1.99-") {
+	let version_str = if data.starts_with(b"SSH-2.0-") || data.starts_with(b"SSH-1.99-") {
 		"2.0"
 	} else if data.starts_with(b"SSH-1.5-") {
 		"1.5"
@@ -27,7 +24,6 @@ pub(crate) fn probe(data: &[u8]) -> (DetectionStatus, ProtocolVersion<'_>) {
 		return (DetectionStatus::NoMatch, ProtocolVersion::Unknown);
 	};
 
-	// Validate the rest of the line is ASCII
 	let limit = data.len().min(64);
 	let mut found_nl = false;
 	for &b in &data[4..limit] {
@@ -35,7 +31,7 @@ pub(crate) fn probe(data: &[u8]) -> (DetectionStatus, ProtocolVersion<'_>) {
 			found_nl = true;
 			break;
 		}
-		if b != b'\r' && (b < 32 || b > 126) {
+		if b != b'\r' && !(32..=126).contains(&b) {
 			return (DetectionStatus::NoMatch, ProtocolVersion::Unknown);
 		}
 	}
@@ -45,8 +41,4 @@ pub(crate) fn probe(data: &[u8]) -> (DetectionStatus, ProtocolVersion<'_>) {
 	} else {
 		(DetectionStatus::Incomplete, ProtocolVersion::Unknown)
 	}
-}
-
-pub(crate) fn detect(data: &[u8]) -> bool {
-	matches!(probe(data).0, DetectionStatus::Match)
 }

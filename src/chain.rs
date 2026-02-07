@@ -7,13 +7,15 @@ use crate::{Protocol, ProtocolDetector, Unknown};
 #[cfg(feature = "std")]
 #[derive(Debug, Default, Clone)]
 pub struct ProtocolChainBuilder {
+	/// Ordered list of protocols to check.
 	order: Vec<Protocol>,
+	/// Maximum bytes to inspect.
 	max_inspect_bytes: usize,
 }
 
 #[cfg(feature = "std")]
 impl ProtocolChainBuilder {
-	/// Creates a new empty chain builder.
+	/// Creates a new empty `ProtocolChainBuilder`.
 	#[must_use]
 	pub fn new() -> Self {
 		Self {
@@ -69,7 +71,7 @@ impl ProtocolChainBuilder {
 		self
 	}
 
-	/// Adds MySQL to the detection chain.
+	/// Adds `MySQL` to the detection chain.
 	#[cfg(feature = "mysql")]
 	#[must_use]
 	pub fn mysql(mut self) -> Self {
@@ -77,7 +79,7 @@ impl ProtocolChainBuilder {
 		self
 	}
 
-	/// Adds PostgreSQL to the detection chain.
+	/// Adds `PostgreSQL` to the detection chain.
 	#[cfg(feature = "postgres")]
 	#[must_use]
 	pub fn postgres(mut self) -> Self {
