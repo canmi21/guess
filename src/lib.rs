@@ -1,5 +1,4 @@
 /* src/lib.rs */
-
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
 #![cfg_attr(not(feature = "std"), no_std)]
@@ -8,10 +7,14 @@
 //!
 //! High-performance zero-copy network protocol detection with version awareness.
 
+/// Protocol detector builder module.
 mod builder;
+/// Custom protocol detection chain module.
 #[cfg(feature = "std")]
 mod chain;
+/// Main protocol detector implementation.
 mod detector;
+/// Individual protocol detection logic.
 mod protocols;
 
 pub use builder::ProtocolDetectorBuilder;
@@ -92,10 +95,10 @@ pub enum Protocol {
 	/// QUIC protocol.
 	#[cfg(feature = "quic")]
 	Quic,
-	/// MySQL protocol.
+	/// `MySQL` protocol.
 	#[cfg(feature = "mysql")]
 	Mysql,
-	/// PostgreSQL protocol.
+	/// `PostgreSQL` protocol.
 	#[cfg(feature = "postgres")]
 	Postgres,
 	/// Redis protocol.
@@ -145,6 +148,7 @@ impl Protocol {
 
 	/// Probes the data and returns the detection status.
 	#[inline(always)]
+	#[must_use]
 	pub fn probe(&self, data: &[u8]) -> DetectionStatus {
 		match self.probe_info(data) {
 			(DetectionStatus::Match, _) => DetectionStatus::Match,
@@ -154,6 +158,8 @@ impl Protocol {
 
 	/// Probes the data and returns status plus version info.
 	#[inline(always)]
+	#[must_use]
+	#[allow(unused_variables)]
 	pub fn probe_info<'a>(&self, data: &'a [u8]) -> (DetectionStatus, ProtocolVersion<'a>) {
 		match self {
 			#[cfg(feature = "http")]
@@ -293,7 +299,9 @@ impl Protocol {
 	}
 }
 
+/// Helper to convert boolean to detection status.
 #[inline(always)]
+#[allow(dead_code)]
 fn bool_to_status(b: bool) -> DetectionStatus {
 	if b {
 		DetectionStatus::Match

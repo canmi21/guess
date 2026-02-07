@@ -1,5 +1,4 @@
 /* src/detector.rs */
-
 use crate::{
 	DetectionError, DetectionResult, DetectionStatus, Protocol, ProtocolInfo, ProtocolVersion,
 };
@@ -18,51 +17,107 @@ pub struct Unknown;
 /// Protocol detector with type-state for transport layer.
 #[derive(Debug, Clone)]
 pub struct ProtocolDetector<Transport = Unknown> {
+	/// Enabled protocols for this detector.
+	#[allow(dead_code)]
 	pub(crate) enabled: ProtocolSet,
+	/// Optional custom priority order for detection.
 	#[cfg(feature = "std")]
 	pub(crate) priority_order: Option<Vec<Protocol>>,
+	/// Maximum bytes to inspect.
 	pub(crate) max_inspect_bytes: usize,
+	/// Version constraints for detection.
+	#[allow(dead_code)]
 	pub(crate) expected_versions: ProtocolVersionSet,
+	/// Transport type marker.
 	pub(crate) _transport: PhantomData<Transport>,
 }
 
+/// A set of enabled protocols.
 #[derive(Default, Clone, Copy, Debug)]
 pub(crate) struct ProtocolSet {
+	/// HTTP enabled.
+	#[cfg(feature = "http")]
 	pub http: bool,
+	/// IMAP enabled.
+	#[cfg(feature = "imap")]
 	pub imap: bool,
+	/// TLS enabled.
+	#[cfg(feature = "tls")]
 	pub tls: bool,
+	/// SSH enabled.
+	#[cfg(feature = "ssh")]
 	pub ssh: bool,
+	/// DNS enabled.
+	#[cfg(feature = "dns")]
 	pub dns: bool,
+	/// FTP enabled.
+	#[cfg(feature = "ftp")]
 	pub ftp: bool,
+	/// DHCP enabled.
+	#[cfg(feature = "dhcp")]
 	pub dhcp: bool,
+	/// NTP enabled.
+	#[cfg(feature = "ntp")]
 	pub ntp: bool,
+	/// QUIC enabled.
+	#[cfg(feature = "quic")]
 	pub quic: bool,
+	/// `MySQL` enabled.
+	#[cfg(feature = "mysql")]
 	pub mysql: bool,
+	/// `PostgreSQL` enabled.
+	#[cfg(feature = "postgres")]
 	pub postgres: bool,
+	/// Redis enabled.
+	#[cfg(feature = "redis")]
 	pub redis: bool,
+	/// MQTT enabled.
+	#[cfg(feature = "mqtt")]
 	pub mqtt: bool,
+	/// SMTP enabled.
+	#[cfg(feature = "smtp")]
 	pub smtp: bool,
+	/// POP3 enabled.
+	#[cfg(feature = "pop3")]
 	pub pop3: bool,
+	/// SMB enabled.
+	#[cfg(feature = "smb")]
 	pub smb: bool,
+	/// SIP enabled.
+	#[cfg(feature = "sip")]
 	pub sip: bool,
+	/// RTSP enabled.
+	#[cfg(feature = "rtsp")]
 	pub rtsp: bool,
+	/// STUN enabled.
+	#[cfg(feature = "stun")]
 	pub stun: bool,
 }
 
+/// A set of expected protocol versions.
 #[derive(Default, Clone, Debug)]
 pub(crate) struct ProtocolVersionSet {
+	/// Expected HTTP version.
 	#[cfg(feature = "http")]
 	pub http: Option<&'static str>,
+	/// Expected TLS version.
 	#[cfg(feature = "tls")]
 	pub tls: Option<&'static str>,
+	/// Expected SSH version.
 	#[cfg(feature = "ssh")]
 	pub ssh: Option<&'static str>,
+	/// Expected Redis version.
 	#[cfg(feature = "redis")]
 	pub redis: Option<u8>,
 }
 
 impl<Transport> ProtocolDetector<Transport> {
 	/// Detects the protocol and returns its information.
+	///
+	/// # Errors
+	///
+	/// Returns `InsufficientData` if more bytes are needed to confirm a protocol.
+	#[allow(unused_variables, unused_mut)]
 	pub fn detect_info<'a>(&self, data: &'a [u8]) -> DetectionResult<Option<ProtocolInfo<'a>>> {
 		let limit = data.len().min(self.max_inspect_bytes);
 		let data = &data[..limit];
@@ -72,7 +127,7 @@ impl<Transport> ProtocolDetector<Transport> {
 		#[cfg(feature = "std")]
 		if let Some(order) = &self.priority_order {
 			for protocol in order {
-				match self.check_protocol(protocol, data) {
+				match self.check_protocol(*protocol, data) {
 					(DetectionStatus::Match, version) => {
 						return Ok(Some(ProtocolInfo {
 							protocol: *protocol,
@@ -93,7 +148,7 @@ impl<Transport> ProtocolDetector<Transport> {
 		// Default detection logic (no Vec allocation)
 		#[cfg(feature = "ssh")]
 		if self.enabled.ssh {
-			match self.check_protocol(&Protocol::Ssh, data) {
+			match self.check_protocol(Protocol::Ssh, data) {
 				(DetectionStatus::Match, version) => {
 					return Ok(Some(ProtocolInfo {
 						protocol: Protocol::Ssh,
@@ -106,7 +161,7 @@ impl<Transport> ProtocolDetector<Transport> {
 		}
 		#[cfg(feature = "sip")]
 		if self.enabled.sip {
-			match self.check_protocol(&Protocol::Sip, data) {
+			match self.check_protocol(Protocol::Sip, data) {
 				(DetectionStatus::Match, version) => {
 					return Ok(Some(ProtocolInfo {
 						protocol: Protocol::Sip,
@@ -119,7 +174,7 @@ impl<Transport> ProtocolDetector<Transport> {
 		}
 		#[cfg(feature = "rtsp")]
 		if self.enabled.rtsp {
-			match self.check_protocol(&Protocol::Rtsp, data) {
+			match self.check_protocol(Protocol::Rtsp, data) {
 				(DetectionStatus::Match, version) => {
 					return Ok(Some(ProtocolInfo {
 						protocol: Protocol::Rtsp,
@@ -132,7 +187,7 @@ impl<Transport> ProtocolDetector<Transport> {
 		}
 		#[cfg(feature = "imap")]
 		if self.enabled.imap {
-			match self.check_protocol(&Protocol::Imap, data) {
+			match self.check_protocol(Protocol::Imap, data) {
 				(DetectionStatus::Match, version) => {
 					return Ok(Some(ProtocolInfo {
 						protocol: Protocol::Imap,
@@ -145,7 +200,7 @@ impl<Transport> ProtocolDetector<Transport> {
 		}
 		#[cfg(feature = "tls")]
 		if self.enabled.tls {
-			match self.check_protocol(&Protocol::Tls, data) {
+			match self.check_protocol(Protocol::Tls, data) {
 				(DetectionStatus::Match, version) => {
 					return Ok(Some(ProtocolInfo {
 						protocol: Protocol::Tls,
@@ -158,7 +213,7 @@ impl<Transport> ProtocolDetector<Transport> {
 		}
 		#[cfg(feature = "http")]
 		if self.enabled.http {
-			match self.check_protocol(&Protocol::Http, data) {
+			match self.check_protocol(Protocol::Http, data) {
 				(DetectionStatus::Match, version) => {
 					return Ok(Some(ProtocolInfo {
 						protocol: Protocol::Http,
@@ -171,7 +226,7 @@ impl<Transport> ProtocolDetector<Transport> {
 		}
 		#[cfg(feature = "dns")]
 		if self.enabled.dns {
-			match self.check_protocol(&Protocol::Dns, data) {
+			match self.check_protocol(Protocol::Dns, data) {
 				(DetectionStatus::Match, version) => {
 					return Ok(Some(ProtocolInfo {
 						protocol: Protocol::Dns,
@@ -184,7 +239,7 @@ impl<Transport> ProtocolDetector<Transport> {
 		}
 		#[cfg(feature = "ftp")]
 		if self.enabled.ftp {
-			match self.check_protocol(&Protocol::Ftp, data) {
+			match self.check_protocol(Protocol::Ftp, data) {
 				(DetectionStatus::Match, version) => {
 					return Ok(Some(ProtocolInfo {
 						protocol: Protocol::Ftp,
@@ -197,7 +252,7 @@ impl<Transport> ProtocolDetector<Transport> {
 		}
 		#[cfg(feature = "dhcp")]
 		if self.enabled.dhcp {
-			match self.check_protocol(&Protocol::Dhcp, data) {
+			match self.check_protocol(Protocol::Dhcp, data) {
 				(DetectionStatus::Match, version) => {
 					return Ok(Some(ProtocolInfo {
 						protocol: Protocol::Dhcp,
@@ -210,7 +265,7 @@ impl<Transport> ProtocolDetector<Transport> {
 		}
 		#[cfg(feature = "ntp")]
 		if self.enabled.ntp {
-			match self.check_protocol(&Protocol::Ntp, data) {
+			match self.check_protocol(Protocol::Ntp, data) {
 				(DetectionStatus::Match, version) => {
 					return Ok(Some(ProtocolInfo {
 						protocol: Protocol::Ntp,
@@ -223,7 +278,7 @@ impl<Transport> ProtocolDetector<Transport> {
 		}
 		#[cfg(feature = "quic")]
 		if self.enabled.quic {
-			match self.check_protocol(&Protocol::Quic, data) {
+			match self.check_protocol(Protocol::Quic, data) {
 				(DetectionStatus::Match, version) => {
 					return Ok(Some(ProtocolInfo {
 						protocol: Protocol::Quic,
@@ -236,7 +291,7 @@ impl<Transport> ProtocolDetector<Transport> {
 		}
 		#[cfg(feature = "mysql")]
 		if self.enabled.mysql {
-			match self.check_protocol(&Protocol::Mysql, data) {
+			match self.check_protocol(Protocol::Mysql, data) {
 				(DetectionStatus::Match, version) => {
 					return Ok(Some(ProtocolInfo {
 						protocol: Protocol::Mysql,
@@ -249,7 +304,7 @@ impl<Transport> ProtocolDetector<Transport> {
 		}
 		#[cfg(feature = "postgres")]
 		if self.enabled.postgres {
-			match self.check_protocol(&Protocol::Postgres, data) {
+			match self.check_protocol(Protocol::Postgres, data) {
 				(DetectionStatus::Match, version) => {
 					return Ok(Some(ProtocolInfo {
 						protocol: Protocol::Postgres,
@@ -262,7 +317,7 @@ impl<Transport> ProtocolDetector<Transport> {
 		}
 		#[cfg(feature = "redis")]
 		if self.enabled.redis {
-			match self.check_protocol(&Protocol::Redis, data) {
+			match self.check_protocol(Protocol::Redis, data) {
 				(DetectionStatus::Match, version) => {
 					return Ok(Some(ProtocolInfo {
 						protocol: Protocol::Redis,
@@ -275,7 +330,7 @@ impl<Transport> ProtocolDetector<Transport> {
 		}
 		#[cfg(feature = "mqtt")]
 		if self.enabled.mqtt {
-			match self.check_protocol(&Protocol::Mqtt, data) {
+			match self.check_protocol(Protocol::Mqtt, data) {
 				(DetectionStatus::Match, version) => {
 					return Ok(Some(ProtocolInfo {
 						protocol: Protocol::Mqtt,
@@ -288,7 +343,7 @@ impl<Transport> ProtocolDetector<Transport> {
 		}
 		#[cfg(feature = "smtp")]
 		if self.enabled.smtp {
-			match self.check_protocol(&Protocol::Smtp, data) {
+			match self.check_protocol(Protocol::Smtp, data) {
 				(DetectionStatus::Match, version) => {
 					return Ok(Some(ProtocolInfo {
 						protocol: Protocol::Smtp,
@@ -301,7 +356,7 @@ impl<Transport> ProtocolDetector<Transport> {
 		}
 		#[cfg(feature = "pop3")]
 		if self.enabled.pop3 {
-			match self.check_protocol(&Protocol::Pop3, data) {
+			match self.check_protocol(Protocol::Pop3, data) {
 				(DetectionStatus::Match, version) => {
 					return Ok(Some(ProtocolInfo {
 						protocol: Protocol::Pop3,
@@ -314,7 +369,7 @@ impl<Transport> ProtocolDetector<Transport> {
 		}
 		#[cfg(feature = "smb")]
 		if self.enabled.smb {
-			match self.check_protocol(&Protocol::Smb, data) {
+			match self.check_protocol(Protocol::Smb, data) {
 				(DetectionStatus::Match, version) => {
 					return Ok(Some(ProtocolInfo {
 						protocol: Protocol::Smb,
@@ -327,7 +382,7 @@ impl<Transport> ProtocolDetector<Transport> {
 		}
 		#[cfg(feature = "stun")]
 		if self.enabled.stun {
-			match self.check_protocol(&Protocol::Stun, data) {
+			match self.check_protocol(Protocol::Stun, data) {
 				(DetectionStatus::Match, version) => {
 					return Ok(Some(ProtocolInfo {
 						protocol: Protocol::Stun,
@@ -346,9 +401,11 @@ impl<Transport> ProtocolDetector<Transport> {
 		}
 	}
 
+	/// Internal helper to check a single protocol with version constraints.
+	#[allow(dead_code, clippy::collapsible_if, clippy::unused_self)]
 	fn check_protocol<'a>(
 		&self,
-		protocol: &Protocol,
+		protocol: Protocol,
 		data: &'a [u8],
 	) -> (DetectionStatus, ProtocolVersion<'a>) {
 		let (status, version) = protocol.probe_info(data);
@@ -393,13 +450,19 @@ impl<Transport> ProtocolDetector<Transport> {
 	}
 
 	/// Backwards compatible detect method.
+	///
+	/// # Errors
+	///
+	/// Returns `InsufficientData` if more bytes are needed.
 	pub fn detect(&self, data: &[u8]) -> DetectionResult<Option<Protocol>> {
 		self
 			.detect_info(data)
 			.map(|opt| opt.map(|info| info.protocol))
 	}
 
+	/// Internal constructor for custom chains.
 	#[cfg(feature = "std")]
+	#[allow(unused_mut)]
 	pub(crate) fn with_order(order: Vec<Protocol>, max_inspect_bytes: usize) -> Self {
 		let mut enabled = ProtocolSet::default();
 		for p in &order {
@@ -458,6 +521,7 @@ impl<Transport> ProtocolDetector<Transport> {
 
 impl ProtocolDetector<Unknown> {
 	/// Creates a new builder.
+	#[must_use]
 	pub fn builder() -> crate::ProtocolDetectorBuilder<Unknown> {
 		crate::ProtocolDetectorBuilder::new()
 	}
