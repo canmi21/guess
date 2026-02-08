@@ -398,3 +398,119 @@ impl<T> ProtocolDetectorBuilder<T> {
 		}
 	}
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::{DetectionError, Protocol};
+
+	// ── Correct paths ──
+
+	#[test]
+	#[cfg(feature = "http")]
+	fn http_build_detects_http() {
+		let detector = ProtocolDetectorBuilder::<Unknown>::new().http().build();
+		let data = b"GET / HTTP/1.1\r\n";
+		assert_eq!(detector.detect(data).unwrap(), Some(Protocol::Http));
+	}
+
+	#[test]
+	#[cfg(feature = "http")]
+	fn all_build_detects_http() {
+		let detector = ProtocolDetectorBuilder::<Unknown>::new().all().build();
+		let data = b"GET / HTTP/1.1\r\n";
+		assert_eq!(detector.detect(data).unwrap(), Some(Protocol::Http));
+	}
+
+	#[test]
+	#[cfg(all(feature = "http", feature = "tls", feature = "ssh"))]
+	fn all_tcp_detects_tcp_protocols() {
+		let detector = ProtocolDetectorBuilder::<Unknown>::new().all_tcp().build();
+		assert_eq!(
+			detector.detect(b"GET / HTTP/1.1\r\n").unwrap(),
+			Some(Protocol::Http)
+		);
+		assert_eq!(
+			detector.detect(b"SSH-2.0-OpenSSH_8.9\r\n").unwrap(),
+			Some(Protocol::Ssh)
+		);
+	}
+
+	#[test]
+	#[cfg(feature = "http")]
+	fn tcp_marker_compiles() {
+		let detector = ProtocolDetectorBuilder::<Unknown>::new()
+			.http()
+			.tcp()
+			.build();
+		let data = b"GET / HTTP/1.1\r\n";
+		assert_eq!(detector.detect(data).unwrap(), Some(Protocol::Http));
+	}
+
+	#[test]
+	#[cfg(feature = "dns")]
+	fn udp_marker_compiles() {
+		let detector = ProtocolDetectorBuilder::<Unknown>::new()
+			.dns()
+			.udp()
+			.build();
+		// DNS requires 12 bytes, crafting a minimal valid DNS query
+		let data: &[u8] = &[
+			0x00, 0x01, // ID
+			0x01, 0x00, // Flags: standard query
+			0x00, 0x01, // Questions: 1
+			0x00, 0x00, // Answer RRs
+			0x00, 0x00, // Authority RRs
+			0x00, 0x00, // Additional RRs
+		];
+		// Just verify it doesn't panic - DNS detection may or may not match
+		let _ = detector.detect(data);
+	}
+
+	#[test]
+	#[cfg(feature = "http")]
+	fn http_version_auto_enables_http() {
+		let detector = ProtocolDetectorBuilder::<Unknown>::new()
+			.http_version("1.1")
+			.build();
+		let data = b"GET / HTTP/1.1\r\n";
+		assert_eq!(detector.detect(data).unwrap(), Some(Protocol::Http));
+	}
+
+	#[test]
+	#[cfg(feature = "tls")]
+	fn tls_version_auto_enables_tls() {
+		let detector = ProtocolDetectorBuilder::<Unknown>::new()
+			.tls_version("1.2")
+			.build();
+		let data: &[u8] = &[
+			0x16, 0x03, 0x01, 0x00, 0x05, 0x01, 0x00, 0x00, 0x01, 0x03, 0x03,
+		];
+		assert_eq!(detector.detect(data).unwrap(), Some(Protocol::Tls));
+	}
+
+	// ── Error paths ──
+
+	#[test]
+	fn empty_builder_returns_none_for_all_data() {
+		let detector = ProtocolDetectorBuilder::<Unknown>::new().build();
+		assert_eq!(detector.detect(b"GET / HTTP/1.1\r\n").unwrap(), None);
+		assert_eq!(detector.detect(b"SSH-2.0-OpenSSH\r\n").unwrap(), None);
+		assert_eq!(detector.detect(&[0x42; 256]).unwrap(), None);
+	}
+
+	#[test]
+	#[cfg(feature = "http")]
+	fn builder_is_consumed_by_build() {
+		let builder = ProtocolDetectorBuilder::<Unknown>::new().http();
+		let _detector = builder.build();
+		// builder is moved — calling builder.build() again would fail to compile
+	}
+
+	#[test]
+	#[cfg(feature = "http")]
+	fn empty_data_returns_error_not_panic() {
+		let detector = ProtocolDetectorBuilder::<Unknown>::new().http().build();
+		assert_eq!(detector.detect(b""), Err(DetectionError::InsufficientData));
+	}
+}

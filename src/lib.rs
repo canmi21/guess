@@ -312,3 +312,126 @@ fn bool_to_status(b: bool) -> DetectionStatus {
 		DetectionStatus::NoMatch
 	}
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	// ── Correct paths ──
+
+	#[test]
+	#[cfg(feature = "http")]
+	fn detect_returns_true_for_valid_http() {
+		let data = b"GET / HTTP/1.1\r\n";
+		assert_eq!(Protocol::Http.detect(data), Ok(true));
+	}
+
+	#[test]
+	#[cfg(feature = "http")]
+	fn probe_returns_match_for_valid_http() {
+		let data = b"GET / HTTP/1.1\r\n";
+		assert_eq!(Protocol::Http.probe(data), DetectionStatus::Match);
+	}
+
+	#[test]
+	#[cfg(feature = "http")]
+	fn probe_info_returns_version_for_http11() {
+		let data = b"GET / HTTP/1.1\r\n";
+		let (status, version) = Protocol::Http.probe_info(data);
+		assert_eq!(status, DetectionStatus::Match);
+		assert_eq!(version, ProtocolVersion::Http("1.1"));
+	}
+
+	#[test]
+	#[cfg(feature = "http")]
+	fn min_bytes_http() {
+		assert_eq!(Protocol::Http.min_bytes(), 4);
+	}
+
+	#[test]
+	#[cfg(feature = "tls")]
+	fn min_bytes_tls() {
+		assert_eq!(Protocol::Tls.min_bytes(), 5);
+	}
+
+	#[test]
+	#[cfg(feature = "ssh")]
+	fn min_bytes_ssh() {
+		assert_eq!(Protocol::Ssh.min_bytes(), 4);
+	}
+
+	#[test]
+	#[cfg(feature = "redis")]
+	fn min_bytes_redis() {
+		assert_eq!(Protocol::Redis.min_bytes(), 1);
+	}
+
+	// ── Error paths ──
+
+	#[test]
+	#[cfg(feature = "http")]
+	fn detect_returns_false_for_empty_data() {
+		assert_eq!(Protocol::Http.detect(b""), Ok(false));
+	}
+
+	#[test]
+	#[cfg(feature = "http")]
+	fn probe_returns_incomplete_for_empty_data() {
+		assert_eq!(Protocol::Http.probe(b""), DetectionStatus::Incomplete);
+	}
+
+	#[test]
+	#[cfg(feature = "http")]
+	fn probe_returns_no_match_for_garbage() {
+		assert_eq!(
+			Protocol::Http.probe(b"\xff\xff\xff\xff\xff"),
+			DetectionStatus::NoMatch
+		);
+	}
+
+	#[test]
+	#[cfg(feature = "http")]
+	fn probe_info_returns_incomplete_for_short_data() {
+		let (status, version) = Protocol::Http.probe_info(&[0u8; 1]);
+		assert_eq!(status, DetectionStatus::Incomplete);
+		assert_eq!(version, ProtocolVersion::Unknown);
+	}
+
+	#[test]
+	#[cfg(feature = "tls")]
+	fn probe_info_returns_incomplete_for_short_tls_data() {
+		let (status, version) = Protocol::Tls.probe_info(&[0x16, 0x03]);
+		assert_eq!(status, DetectionStatus::Incomplete);
+		assert_eq!(version, ProtocolVersion::Unknown);
+	}
+
+	#[test]
+	#[cfg(feature = "ssh")]
+	fn probe_returns_match_for_valid_ssh() {
+		let data = b"SSH-2.0-OpenSSH_8.9\r\n";
+		assert_eq!(Protocol::Ssh.probe(data), DetectionStatus::Match);
+	}
+
+	#[test]
+	#[cfg(feature = "ssh")]
+	fn probe_info_returns_ssh_version() {
+		let data = b"SSH-2.0-OpenSSH_8.9\r\n";
+		let (status, version) = Protocol::Ssh.probe_info(data);
+		assert_eq!(status, DetectionStatus::Match);
+		assert_eq!(version, ProtocolVersion::Ssh("2.0"));
+	}
+
+	#[test]
+	#[cfg(feature = "tls")]
+	fn probe_returns_match_for_valid_tls12_client_hello() {
+		// TLS 1.2 ClientHello
+		let data: &[u8] = &[
+			0x16, 0x03, 0x01, 0x00, 0x05, // record header
+			0x01, 0x00, 0x00, 0x01, // handshake header
+			0x03, 0x03, // client version: TLS 1.2
+		];
+		let (status, version) = Protocol::Tls.probe_info(data);
+		assert_eq!(status, DetectionStatus::Match);
+		assert_eq!(version, ProtocolVersion::Tls("1.2"));
+	}
+}

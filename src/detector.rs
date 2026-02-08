@@ -537,3 +537,146 @@ impl ProtocolDetector<Unknown> {
 impl ProtocolDetector<Tcp> {}
 
 impl ProtocolDetector<Udp> {}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::ProtocolDetectorBuilder;
+
+	// ── Correct paths ──
+
+	#[test]
+	#[cfg(feature = "http")]
+	fn all_detects_http() {
+		let detector = ProtocolDetectorBuilder::<Unknown>::new().all().build();
+		let data = b"GET / HTTP/1.1\r\n";
+		let result = detector.detect(data).unwrap();
+		assert_eq!(result, Some(Protocol::Http));
+	}
+
+	#[test]
+	#[cfg(feature = "tls")]
+	fn all_detects_tls() {
+		let detector = ProtocolDetectorBuilder::<Unknown>::new().all().build();
+		// TLS 1.2 ClientHello
+		let data: &[u8] = &[
+			0x16, 0x03, 0x01, 0x00, 0x05, 0x01, 0x00, 0x00, 0x01, 0x03, 0x03,
+		];
+		let result = detector.detect(data).unwrap();
+		assert_eq!(result, Some(Protocol::Tls));
+	}
+
+	#[test]
+	#[cfg(feature = "ssh")]
+	fn all_detects_ssh() {
+		let detector = ProtocolDetectorBuilder::<Unknown>::new().all().build();
+		let data = b"SSH-2.0-OpenSSH_8.9\r\n";
+		let result = detector.detect(data).unwrap();
+		assert_eq!(result, Some(Protocol::Ssh));
+	}
+
+	#[test]
+	#[cfg(feature = "http")]
+	fn single_protocol_only_detects_that_protocol() {
+		let detector = ProtocolDetectorBuilder::<Unknown>::new().http().build();
+		let data = b"GET / HTTP/1.1\r\n";
+		assert_eq!(detector.detect(data).unwrap(), Some(Protocol::Http));
+
+		// SSH data should not be detected when only HTTP is enabled
+		let ssh_data = b"SSH-2.0-OpenSSH_8.9\r\n";
+		assert_eq!(detector.detect(ssh_data).unwrap(), None);
+	}
+
+	#[test]
+	#[cfg(feature = "http")]
+	fn detect_info_returns_protocol_info_with_version() {
+		let detector = ProtocolDetectorBuilder::<Unknown>::new().http().build();
+		let data = b"GET / HTTP/1.1\r\n";
+		let info = detector.detect_info(data).unwrap().unwrap();
+		assert_eq!(info.protocol, Protocol::Http);
+		assert_eq!(info.version, ProtocolVersion::Http("1.1"));
+	}
+
+	#[test]
+	#[cfg(feature = "http")]
+	fn detect_returns_protocol_without_version() {
+		let detector = ProtocolDetectorBuilder::<Unknown>::new().http().build();
+		let data = b"GET / HTTP/1.1\r\n";
+		let result = detector.detect(data).unwrap();
+		assert_eq!(result, Some(Protocol::Http));
+	}
+
+	#[test]
+	#[cfg(feature = "http")]
+	fn version_filter_matches_correct_version() {
+		let detector = ProtocolDetectorBuilder::<Unknown>::new()
+			.http_version("1.1")
+			.build();
+		let data = b"GET / HTTP/1.1\r\n";
+		assert_eq!(detector.detect(data).unwrap(), Some(Protocol::Http));
+	}
+
+	#[test]
+	#[cfg(feature = "http")]
+	fn version_filter_rejects_wrong_version() {
+		let detector = ProtocolDetectorBuilder::<Unknown>::new()
+			.http_version("1.0")
+			.build();
+		let data = b"GET / HTTP/1.1\r\n";
+		assert_eq!(detector.detect(data).unwrap(), None);
+	}
+
+	#[test]
+	#[cfg(feature = "http")]
+	fn max_inspect_bytes_truncates_but_still_works() {
+		// Data is longer than max_inspect_bytes but HTTP header is within range
+		let detector = ProtocolDetectorBuilder::<Unknown>::new().http().build();
+		let mut data = b"GET / HTTP/1.1\r\n".to_vec();
+		data.extend_from_slice(&[0u8; 256]);
+		assert_eq!(detector.detect(&data).unwrap(), Some(Protocol::Http));
+	}
+
+	// ── Error paths ──
+
+	#[test]
+	#[cfg(feature = "http")]
+	fn empty_data_with_protocol_enabled_returns_insufficient_data() {
+		let detector = ProtocolDetectorBuilder::<Unknown>::new().http().build();
+		assert_eq!(
+			detector.detect(b""),
+			Err(DetectionError::InsufficientData)
+		);
+	}
+
+	#[test]
+	#[cfg(feature = "http")]
+	fn short_data_with_protocol_enabled_returns_insufficient_data() {
+		let detector = ProtocolDetectorBuilder::<Unknown>::new().http().build();
+		assert_eq!(
+			detector.detect(&[0x47]),
+			Err(DetectionError::InsufficientData)
+		);
+	}
+
+	#[test]
+	fn no_protocols_enabled_returns_none() {
+		let detector = ProtocolDetectorBuilder::<Unknown>::new().build();
+		assert_eq!(detector.detect(b"GET / HTTP/1.1\r\n").unwrap(), None);
+	}
+
+	#[test]
+	#[cfg(feature = "http")]
+	fn garbage_data_returns_none() {
+		let detector = ProtocolDetectorBuilder::<Unknown>::new().http().build();
+		let garbage = [0x42u8; 256];
+		assert_eq!(detector.detect(&garbage).unwrap(), None);
+	}
+
+	#[test]
+	fn max_inspect_bytes_usize_max_does_not_overflow() {
+		let mut detector = ProtocolDetectorBuilder::<Unknown>::new().build();
+		detector.max_inspect_bytes = usize::MAX;
+		let data = b"some data that should not crash";
+		let _ = detector.detect(data);
+	}
+}
