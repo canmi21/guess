@@ -26,7 +26,7 @@ Check the `examples` directory for runnable code:
 
 ```toml
 [dependencies]
-guess = { version = "0.1", features = ["full"] }
+guess = { version = "0.2", features = ["full"] }
 ```
 
 ## Feature Flags
@@ -34,6 +34,10 @@ guess = { version = "0.1", features = ["full"] }
 | Feature | Description |
 |---------|-------------|
 | `std` | Standard library support (for custom chains). |
+| `tcp` | All common TCP-based protocols. |
+| `udp` | All common UDP-based protocols. |
+| `web` | Includes `http`, `tls`, `quic`. |
+| `db` | Includes `mysql`, `postgres`, `redis`. |
 | `http` | HTTP & version extraction (1.0, 1.1, 2.0). |
 | `tls` | TLS (SSL) & version extraction (1.0-1.3). |
 | `ssh` | SSH & version extraction (1.5, 2.0). |
@@ -53,10 +57,6 @@ guess = { version = "0.1", features = ["full"] }
 | `stun` | STUN (NAT traversal). |
 | `dhcp` | DHCP (BOOTP) & magic cookies. |
 | `ntp` | NTP (Network Time Protocol). |
-| `web` | Includes `http`, `tls`, `quic`. |
-| `db` | Includes `mysql`, `postgres`, `redis`. |
-| `tcp` | All common TCP-based protocols. |
-| `udp` | All common UDP-based protocols. |
 | `tracing` | Optional instrumentation using `tracing` crate. |
 | `full` | Enables all features above. |
 
