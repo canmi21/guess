@@ -315,6 +315,7 @@ fn bool_to_status(b: bool) -> DetectionStatus {
 
 #[cfg(test)]
 mod tests {
+	#[allow(unused_imports)]
 	use super::*;
 
 	// ── Correct paths ──

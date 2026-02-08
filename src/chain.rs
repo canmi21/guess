@@ -257,7 +257,9 @@ impl ProtocolChainBuilder {
 
 #[cfg(test)]
 mod tests {
+	#[allow(unused_imports)]
 	use super::*;
+	#[allow(unused_imports)]
 	use crate::DetectionError;
 
 	// ── Correct paths ──

@@ -401,7 +401,9 @@ impl<T> ProtocolDetectorBuilder<T> {
 
 #[cfg(test)]
 mod tests {
+	#[allow(unused_imports)]
 	use super::*;
+	#[allow(unused_imports)]
 	use crate::{DetectionError, Protocol};
 
 	// ── Correct paths ──

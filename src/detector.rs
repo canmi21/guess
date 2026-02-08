@@ -540,7 +540,9 @@ impl ProtocolDetector<Udp> {}
 
 #[cfg(test)]
 mod tests {
+	#[allow(unused_imports)]
 	use super::*;
+	#[allow(unused_imports)]
 	use crate::ProtocolDetectorBuilder;
 
 	// ── Correct paths ──
@@ -642,10 +644,7 @@ mod tests {
 	#[cfg(feature = "http")]
 	fn empty_data_with_protocol_enabled_returns_insufficient_data() {
 		let detector = ProtocolDetectorBuilder::<Unknown>::new().http().build();
-		assert_eq!(
-			detector.detect(b""),
-			Err(DetectionError::InsufficientData)
-		);
+		assert_eq!(detector.detect(b""), Err(DetectionError::InsufficientData));
 	}
 
 	#[test]
