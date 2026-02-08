@@ -24,10 +24,6 @@ pub(crate) fn detect(data: &[u8]) -> bool {
 		return false;
 	}
 
-	if version != 0 && (first_byte & 0x0C) != 0 {
-		return false;
-	}
-
 	let dcid_len = data[5] as usize;
 	if dcid_len > 20 {
 		return false;
@@ -66,11 +62,14 @@ mod tests {
 	}
 
 	#[test]
-	fn test_reject_invalid_reserved_bits() {
+	fn test_accept_header_protected_bits() {
+		// After QUIC header protection, lower 4 bits may be non-zero
 		let mut data = [0u8; 64];
-		data[0] = 0xCC;
-		data[4] = 0x01;
-		assert!(!detect(&data));
+		data[0] = 0xCF; // 1100 1111 — lower bits set by header protection
+		data[4] = 0x01; // version 1
+		data[5] = 0x08; // DCID length
+		data[14] = 0x08; // SCID length
+		assert!(detect(&data));
 	}
 
 	#[test]

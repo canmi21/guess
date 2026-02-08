@@ -135,6 +135,34 @@ impl ProtocolChainBuilder {
 		{
 			self.order.push(Protocol::Mqtt);
 		}
+		#[cfg(feature = "smtp")]
+		{
+			self.order.push(Protocol::Smtp);
+		}
+		#[cfg(feature = "pop3")]
+		{
+			self.order.push(Protocol::Pop3);
+		}
+		#[cfg(feature = "imap")]
+		{
+			self.order.push(Protocol::Imap);
+		}
+		#[cfg(feature = "ftp")]
+		{
+			self.order.push(Protocol::Ftp);
+		}
+		#[cfg(feature = "smb")]
+		{
+			self.order.push(Protocol::Smb);
+		}
+		#[cfg(feature = "sip")]
+		{
+			self.order.push(Protocol::Sip);
+		}
+		#[cfg(feature = "rtsp")]
+		{
+			self.order.push(Protocol::Rtsp);
+		}
 		self
 	}
 
@@ -149,6 +177,26 @@ impl ProtocolChainBuilder {
 		#[cfg(feature = "quic")]
 		{
 			self.order.push(Protocol::Quic);
+		}
+		#[cfg(feature = "dhcp")]
+		{
+			self.order.push(Protocol::Dhcp);
+		}
+		#[cfg(feature = "ntp")]
+		{
+			self.order.push(Protocol::Ntp);
+		}
+		#[cfg(feature = "stun")]
+		{
+			self.order.push(Protocol::Stun);
+		}
+		#[cfg(feature = "sip")]
+		{
+			self.order.push(Protocol::Sip);
+		}
+		#[cfg(feature = "rtsp")]
+		{
+			self.order.push(Protocol::Rtsp);
 		}
 		self
 	}

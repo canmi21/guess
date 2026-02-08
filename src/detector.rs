@@ -237,6 +237,19 @@ impl<Transport> ProtocolDetector<Transport> {
 				(DetectionStatus::NoMatch, _) => {}
 			}
 		}
+		#[cfg(feature = "smtp")]
+		if self.enabled.smtp {
+			match self.check_protocol(Protocol::Smtp, data) {
+				(DetectionStatus::Match, version) => {
+					return Ok(Some(ProtocolInfo {
+						protocol: Protocol::Smtp,
+						version,
+					}));
+				}
+				(DetectionStatus::Incomplete, _) => any_incomplete = true,
+				(DetectionStatus::NoMatch, _) => {}
+			}
+		}
 		#[cfg(feature = "ftp")]
 		if self.enabled.ftp {
 			match self.check_protocol(Protocol::Ftp, data) {
@@ -334,19 +347,6 @@ impl<Transport> ProtocolDetector<Transport> {
 				(DetectionStatus::Match, version) => {
 					return Ok(Some(ProtocolInfo {
 						protocol: Protocol::Mqtt,
-						version,
-					}));
-				}
-				(DetectionStatus::Incomplete, _) => any_incomplete = true,
-				(DetectionStatus::NoMatch, _) => {}
-			}
-		}
-		#[cfg(feature = "smtp")]
-		if self.enabled.smtp {
-			match self.check_protocol(Protocol::Smtp, data) {
-				(DetectionStatus::Match, version) => {
-					return Ok(Some(ProtocolInfo {
-						protocol: Protocol::Smtp,
 						version,
 					}));
 				}

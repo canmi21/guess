@@ -20,6 +20,8 @@ pub(crate) fn probe(data: &[u8]) -> (DetectionStatus, ProtocolVersion<'_>) {
 		"2.0"
 	} else if data.starts_with(b"SSH-1.5-") {
 		"1.5"
+	} else if b"SSH-1.99-".starts_with(data) {
+		return (DetectionStatus::Incomplete, ProtocolVersion::Unknown);
 	} else {
 		return (DetectionStatus::NoMatch, ProtocolVersion::Unknown);
 	};

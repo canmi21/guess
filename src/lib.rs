@@ -161,6 +161,9 @@ impl Protocol {
 	#[must_use]
 	#[allow(unused_variables)]
 	pub fn probe_info<'a>(&self, data: &'a [u8]) -> (DetectionStatus, ProtocolVersion<'a>) {
+		if data.len() < self.min_bytes() {
+			return (DetectionStatus::Incomplete, ProtocolVersion::Unknown);
+		}
 		match self {
 			#[cfg(feature = "http")]
 			Self::Http => protocols::http::probe(data),

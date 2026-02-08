@@ -61,7 +61,7 @@ fn validate_dns_header(header: &[u8]) -> bool {
 	}
 
 	let ra_z_rcode = header[3];
-	let z = (ra_z_rcode >> 4) & 0x07;
+	let z = (ra_z_rcode >> 6) & 0x01;
 
 	if z != 0 {
 		return false;
@@ -150,9 +150,32 @@ mod tests {
 	fn test_reject_nonzero_z() {
 		let mut data = [0u8; 12];
 		data[2] = 0x01;
-		data[3] = 0x10;
+		data[3] = 0x40; // actual Z bit (bit 6)
 		data[5] = 0x01;
 		assert!(!detect(&data));
+	}
+
+	#[test]
+	fn test_accept_dnssec_ad_flag() {
+		// AD bit set (bit 5 of byte 3) — common in DNSSEC responses
+		let mut data = [0u8; 13];
+		data[2] = 0x81; // QR=1, RD=1
+		data[3] = 0x20; // AD=1
+		data[5] = 0x01; // QDCOUNT=1
+		data[7] = 0x01; // ANCOUNT=1
+		data[12] = 0x00; // root label
+		assert!(detect(&data));
+	}
+
+	#[test]
+	fn test_accept_dnssec_cd_flag() {
+		// CD bit set (bit 4 of byte 3) — Checking Disabled
+		let mut data = [0u8; 13];
+		data[2] = 0x01; // RD=1
+		data[3] = 0x10; // CD=1
+		data[5] = 0x01; // QDCOUNT=1
+		data[12] = 0x00; // root label
+		assert!(detect(&data));
 	}
 
 	#[test]

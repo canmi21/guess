@@ -61,6 +61,8 @@ fn is_likely_http_method(data: &[u8]) -> bool {
 		|| data.starts_with(b"HEAD ")
 		|| data.starts_with(b"OPTIONS ")
 		|| data.starts_with(b"CONNECT ")
+		|| data.starts_with(b"TRACE ")
+		|| data.starts_with(b"PATCH ")
 }
 
 /// Helper to find a substring in a byte slice.
