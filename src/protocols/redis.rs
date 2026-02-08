@@ -12,8 +12,8 @@ pub(crate) fn probe(data: &[u8]) -> (DetectionStatus, ProtocolVersion<'_>) {
 			return (DetectionStatus::Incomplete, ProtocolVersion::Unknown);
 		}
 		return match data[0] {
-			b'+' | b'-' | b':' | b'$' | b'*' | b'_' | b',' | b'#' | b'!' | b'=' | b'(' | b'%'
-			| b'~' | b'>' => (DetectionStatus::Incomplete, ProtocolVersion::Unknown),
+			b'+' | b'-' | b':' | b'$' | b'*' | b'_' | b',' | b'#' | b'!' | b'=' | b'(' | b'%' | b'~'
+			| b'>' => (DetectionStatus::Incomplete, ProtocolVersion::Unknown),
 			_ => (DetectionStatus::NoMatch, ProtocolVersion::Unknown),
 		};
 	}
